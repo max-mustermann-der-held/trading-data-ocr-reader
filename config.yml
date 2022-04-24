@@ -1,0 +1,42 @@
+info:
+  author: me
+  email: me@noreply.com
+  description: |-
+    Internal configuration file for application
+    which scrapes ASX 30 (day interbank cash rate futures implied yield target).
+settings:
+  url: https://www.dailyfx.com/dax-40/some-file.pdf
+  paths:
+    data: 'data'
+    temp: 'tmp' # WARNING! This *must* be a new path name.
+    db:   'data/data.db'
+  ocr:
+    colour_space: gray # NOTE: use the wrong spelling instead of grey.
+    transparency:
+      colour: white
+      fuzz: 48
+    geometry:
+      dx: 3.1
+      width:  870
+      height:  38
+      x_off:  168
+      y_off:  650
+    # In numerical column the decimal points is not always picked up.
+    # Therefore forcibly add it in, assuming rates are between 0 and 1.
+    force_decimal: true
+  database:
+    name: scrape
+    schema:
+      id:
+        type: INTEGER
+        define_type: INTEGER PRIMARY KEY
+        insert: false
+      scrape_date:
+        type:   DATE
+        insert: true
+      date:
+        type:   TEXT
+        insert: true
+      cash_rate:
+        type:   REAL
+        insert: true
