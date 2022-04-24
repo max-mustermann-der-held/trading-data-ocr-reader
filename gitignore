@@ -1,0 +1,22 @@
+*
+!/.gitignore
+!/README.md
+
+# dev + deployment scripts:
+!/Makefile
+!/package.json
+
+# private configuration (hide this):
+/.env
+
+# public configuration:
+!/config.yml
+
+# code
+!/src
+!/src/**/
+!/src/**/*.r
+!/main.r
+
+# data (keep folder, but do not synchronise data)
+!/data
