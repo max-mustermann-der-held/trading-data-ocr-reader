@@ -75,7 +75,6 @@ setup:
 	@$(call install_r_package_min_version,modules,0.10.0)
 	@$(call install_r_package_min_version,purrr,0.3.4)
 	@$(call install_r_package_min_version,R.oo,1.24.0)
-	@$(call install_r_package_min_version,readr,2.1.2)
 	@$(call install_r_package_min_version,RSQLite,2.2.12)
 	@$(call install_r_package_min_version,stringr,1.4.0)
 	@$(call install_r_package_min_version,tesseract,5.0.0)
