@@ -11,7 +11,7 @@ suppressMessages(import('dotenv'));
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 get_secret <- function(path, keys) {
-    secrets <- dotenv::load_dot_env(file=path);
+    dotenv::load_dot_env(file=path);
     return (Sys.getenv(keys));
 }
 
