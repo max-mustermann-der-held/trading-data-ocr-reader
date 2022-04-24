@@ -11,7 +11,6 @@ suppressMessages(library('magick'));
 suppressMessages(library('modules'));
 suppressMessages(library('purrr'));
 suppressMessages(library('R.oo'));
-suppressMessages(library('readr'));
 suppressMessages(library('stringr'));
 suppressMessages(library('tesseract'));
 suppressMessages(library('tibble'));
@@ -34,7 +33,7 @@ FILENAME_CONFIG <- 'config.yml';
 
 main <- function() {
     # immediately capture the current moment:
-    date_now <- Sys.Date();
+    date_now <- Sys.time();
 
     # extract private + public settings:
     secrets <- step_get_secrets();
@@ -67,18 +66,23 @@ step_get_secrets <- function() {
 
 # Extracts settings from config.yml
 step_get_config <- function(date) {
+    # read config.yml:
     module_utils$return.multiple(list(
         info     = 'info',
         settings = 'settings'
     ), module_config$get_config)(FILENAME_CONFIG);
 
+    # compute remaining configurations:
     settings$path <- base::tempfile(
         pattern = 'scrape_',
         tmpdir  = settings$paths$temp,
         fileext = '.pdf'
     );
-    settings$paths$csv <- file.path(settings$paths$data, paste0('data_', date, '.csv'));
+    settings$paths$csv <- file.path(settings$paths$data, paste0('data_', format(date, '%Y-%m-%d'), '.csv'));
     settings$date <- date;
+
+    # set locale:
+    Sys.setlocale(category='LC_ALL', locale=settings$locale);
 
     return (settings);
 }
@@ -96,7 +100,6 @@ step_get_inputs <- function(config) {
 
 # NOTE: Table in the PDF appears as an image. Thus ocr required to extract data.
 step_extract_data <- function(config) {
-    # date_now <- lubridate::my(config$date); # FIXME: this does not work!
     date_now <- config$date;
     geometry <- config$ocr$geometry;
     dx <- geometry$dx;
@@ -139,11 +142,15 @@ step_extract_data <- function(config) {
         date        = text_parts[[1]],
         cash_rate   = text_parts[[2]]
     );
-    # force this regardless:
-    data <- data |> mutate(cash_rate = gsub('^0(\\d+)$', '0.\\1', cash_rate));
+    # clean up formatting:
+    data <- data |> mutate(
+        scrape_date = format(scrape_date, '%Y-%m-%d %H:%M:%S'),
+        date        = format(lubridate::as_date(paste0('01-', date), format='%d-%b-%y'), '%Y-%m'),
+        cash_rate   = gsub('^(+|-|)0(\\d+)', '\\10.\\2', cash_rate)
+    )
     # for other numbers force this too, if set in config:
     if (config$ocr$force_decimal) {
-        data <- data |> mutate(cash_rate = gsub('^\\d(\\d+)$', '0.\\1', cash_rate));
+        data <- data |> mutate(cash_rate = gsub('^(+|-|)\\d(\\d+)', '\\10.\\2', cash_rate));
     }
     data <- data |> mutate(cash_rate = as.numeric(cash_rate));
 }
@@ -157,7 +164,14 @@ step_update_data <- function(config, data, fp) {
 
     # store extracted data to csv:
     module_utils$create_folder(path_data);
-    readr::write_csv(data, config$paths$csv);
+    utils::write.csv2(
+        data,
+        file   = config$paths$csv,
+        append = FALSE,
+        dec    = '.',
+        sep    = ';',
+        row.names = FALSE
+    );
 
     # add extracted date to db:
     cursor <- module_db$db_create_if_not_exists(
@@ -165,7 +179,7 @@ step_update_data <- function(config, data, fp) {
         name   = db_name,
         schema = schema
     );
-    module_db$db_add_lines(cursor = cursor, data = data, name = db_name, schema = schema);
+    module_db$db_add_lines(cursor = cursor, data = data, name = db_name, schema = schema, overwrite = TRUE);
     module_db$db_disconnect(cursor);
 }
 
@@ -173,14 +187,20 @@ step_update_data <- function(config, data, fp) {
 step_notify_user <- function(secrets, config) {
     message(sprintf(
         'Sending notification about extracted data to \x1b[1m%s <%s>\x1b[0m.',
-        secrets$name,
-        secrets$email
+        string_else_if_empty(secrets$name, '-'),
+        string_else_if_empty(secrets$email, '-')
     ));
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # AUXILIARY METHODS
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+string_else_if_empty <- function(text, default) {
+    result <- default;
+    if (is.character(text)) if (text != '') result <- text;
+    return (result);
+}
 
 remove_temp_folder <- function(config) {
     module_utils$remove_folder(config$paths$temp);
@@ -202,4 +222,4 @@ pad_data <- function(data, default = NA) {
 # EXECUTION
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-main();
+invisible(main());

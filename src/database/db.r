@@ -26,20 +26,33 @@ db_disconnect <- function(cursor) {
     DBI::dbDisconnect(cursor);
 }
 
-db_add_lines <- function(cursor, data, name, schema) {
+db_add_lines <- function(cursor, data, name, schema, overwrite = FALSE) {
     n <- base::nrow(data);
     for (k in c(1:n)) {
         row <- as.list(data[k, ]);
-        row <- prepare_row_for_insert(row, schema);
+        # First remove all repeat occurrence:
+        if (overwrite) {
+            parts <- check_unique(row, schema);
+            result <- db_remove_entry(cursor, parts=parts, name=name);
+            while(!DBI::dbHasCompleted(result)) Sys.sleep(0.1);
+        }
+        # Now insert new data:
+        parts <- prepare_row_for_insert(row, schema);
+        result <- db_add_line(cursor, parts=parts, name=name);
         # Wait until query completed:
-        result <- db_add_line(cursor, row, name);
         while(!DBI::dbHasCompleted(result)) Sys.sleep(0.1);
     }
 }
 
-db_add_line <- function(cursor, row, name) {
-    keys   <- paste(names(row), collapse=', ');
-    values <- paste(as.vector(unlist(row)), collapse=', ');
+db_remove_entry <- function(cursor, parts, name) {
+    query <- sprintf('DELETE FROM %s WHERE %s', name, paste0(parts, collapse=' AND '));
+    result <- DBI::dbSendQuery(cursor, query);
+    return(result);
+}
+
+db_add_line <- function(cursor, parts, name) {
+    keys   <- paste(names(parts), collapse=', ');
+    values <- paste(as.vector(unlist(parts)), collapse=', ');
     query <- sprintf(
         'INSERT INTO %s (%s) VALUES (%s)',
         name,
@@ -54,20 +67,36 @@ db_add_line <- function(cursor, row, name) {
 # AUXILIARY METHODS:
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+check_unique <- function(row, schema) {
+    parts <- c();
+    for (col in names(schema)) {
+        value <- row[[col]];
+        attributes <- schema[[col]];
+        if (!attributes$insert) next;
+        if (!attributes$unique) next;
+        # Place non-numerical values in quotations:
+        type <- attributes$type;
+        if (type %in% c('TEXT', 'DATE', 'DATETIME')) {
+            value <- sprintf('"%s"', value);
+        }
+        parts <- c(sprintf('%s = %s', col, value));
+    }
+    return (parts);
+}
+
 prepare_row_for_insert <- function(row, schema) {
     parts <- list();
     for (col in names(schema)) {
         value <- row[[col]];
         attributes <- schema[[col]];
         if (!attributes$insert) next;
-        type <- attributes$type;
         # Place non-numerical values in quotations:
-        if (type %in% c('TEXT', 'DATE')) {
+        type <- attributes$type;
+        if (type %in% c('TEXT', 'DATE', 'DATETIME')) {
             value <- sprintf('"%s"', value);
         }
         parts[[col]] <- value;
     }
-
     return (parts);
 }
 
