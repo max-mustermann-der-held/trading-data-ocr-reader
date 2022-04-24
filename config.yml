@@ -5,6 +5,7 @@ info:
     Internal configuration file for application
     which scrapes ASX 30 (day interbank cash rate futures implied yield target).
 settings:
+  locale: 'en_GB.UTF-8'
   url: https://www.dailyfx.com/dax-40/some-file.pdf
   paths:
     data: 'data'
@@ -31,12 +32,16 @@ settings:
         type: INTEGER
         define_type: INTEGER PRIMARY KEY
         insert: false
+        unique: true
       scrape_date:
+        type:   DATETIME
+        insert: true
+        unique: false
+      date:
         type:   DATE
         insert: true
-      date:
-        type:   TEXT
-        insert: true
+        unique: true
       cash_rate:
         type:   REAL
         insert: true
+        unique: false
